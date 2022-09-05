@@ -4,11 +4,11 @@ pipeline{
     stages{
         stage("Git Checkout"){
             steps{
-                git credentialsId: 'github-creds', url: 'https://github.com/kishanth94/javawebapplication'
+                git credentialsId: 'github-creds', url: 'https://github.com/muraliraws2022/javawebapplication1'
             }
         }
-	
-        stage('Quality Gate Status Check'){
+	   
+	stage('Quality Gate Status Check'){
             steps{
                 script{
 			withSonarQubeEnv(credentialsId: 'sonar-token') { 
@@ -20,14 +20,13 @@ pipeline{
 			            def qg = waitForQualityGate()
 				                if (qg.status != 'OK') {
 					                 error "Pipeline aborted due to quality gate failure: ${qg.status}"
-				                }
+											                }
                           }
                 }
             }  
         }
 	
-	
-        stage("Maven Build"){
+	stage("Maven Build"){
             steps{
                 script{
                 // Get Home Path of Maven 
@@ -36,42 +35,16 @@ pipeline{
                 }
             }
         }
-	
-	
-	stage("Upload War To Nexus"){
-	    steps{
-		script{
-		    def mavenPom = readMavenPom file: 'pom.xml'
-		    def nexusRepoName = mavenPom.version.endsWith("SNAPSHOT") ? "javawebapplication-snapshot" : "javawebapplication-release"
-		    nexusArtifactUploader artifacts: [
-			[
-			    artifactId: 'javawebapplication', 
-		            classifier: '', 
-			    file: "target/javawebapplication-${mavenPom.version}.war", 
-			    type: 'war'
-			]
-			], 
-			    credentialsId: 'nexus3', 
-			    groupId: 'in.javahome', 
-			    nexusUrl: '172.31.17.37:8081', 
-			    nexusVersion: 'nexus3', 
-			    protocol: 'http', 
-			    repository: nexusRepoName, 
-			    version: "${mavenPom.version}"    
-                       }
-		}
-	}
-	
-	
-        stage("Deploy to Tomcat Server"){
+
+ stage("Deploy to Tomcat Server"){
             steps{
                 sshagent(['tomcat-keypair']) {
                 sh """
 		    echo $WORKSPACE
 		    mv target/*.war target/javawebapplication.war
-                    scp -o StrictHostKeyChecking=no target/javawebapplication.war  ec2-user@172.31.46.22:/opt/tomcat8/webapps/
-                    ssh ec2-user@172.31.46.22 /opt/tomcat8/bin/shutdown.sh
-                    ssh ec2-user@172.31.46.22 /opt/tomcat8/bin/startup.sh
+                    scp -o StrictHostKeyChecking=no target/javawebapplication.war  ec2-user@172.31.90.125:/opt/tomcat8/webapps/
+                    ssh ec2-user@172.31.90.125 /opt/tomcat8/bin/shutdown.sh
+                    ssh ec2-user@172.31.90.125 /opt/tomcat8/bin/startup.sh
                 
                 """
                 }
@@ -79,21 +52,4 @@ pipeline{
             }
         }
     } 
-    
-    post {
-	   always {
-	     echo 'Deleting the Workspace'
-	     deleteDir() /* Clean Up our Workspace */
-	    }
-	    success {
-		mail to: 'devopsawsfreetier@gmail.com',
-		  subject: "Success Build Pipeline: ${currentBuild.fullDisplayName}",
-		  body: "The pipeline ${env.BUILD_URL} completed successfully"
-	    }
-	    failure {
-  	        mail to: 'devopsawsfreetier@gmail.com',
- 		  subject: "Failed Build Pipeline: ${currentBuild.fullDisplayName}",
- 		  body: "Something is wrong with ${env.BUILD_URL}"
- 	    }
-    }
 }
